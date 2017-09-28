@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8082" doc:name="HTTP Listener Configuration"/>
+    <jms:activemq-connector name="Active_MQ" specification="1.1" brokerURL="tcp://localhost:61616" validateConnections="true" doc:name="Active MQ"/>
+    <jms:activemq-connector name="Active_MQ1" specification="1.1" brokerURL="tcp://localhost:61616" validateConnections="true" doc:name="Active MQ"/>
+    <jms:activemq-connector name="Active_MQ2" specification="1.1" brokerURL="tcp://localhost:61616" validateConnections="true" doc:name="Active MQ"/>
+    <flow name="associatebankerrorloggerFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/" doc:name="HTTP"/>
+        <set-variable variableName="errorVariable" value="#[message.inboundProperties.'http.query.params'.errorDescription]" doc:name="Variable"/>
+        <set-payload value="#[flowVars.errorVariable]" doc:name="Set Payload"/>
+        <component class="associatebankerrorlogger.com.CodeGenerator" doc:name="Java">
+        
+         <method-entry-point-resolver>
+        <include-entry-point method="onCall"/>
+    </method-entry-point-resolver>
+        </component>
+        <set-variable variableName="varPayload" value="#[payload]" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="00fcd58e-f9f4-4554-b51e-dba3ec97a94c">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	Description: flowVars.varPayload
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <jms:outbound-endpoint queue="in" connector-ref="Active_MQ" doc:name="JMS">
+        </jms:outbound-endpoint>
+        <catch-exception-strategy doc:name="associatebankerrorloggerCatch_Exception_Strategy">
+            <set-payload value="{
+&quot;Description&quot;:&quot;Service Not available&quot;
+
+}" doc:name="Set Payload"/>
+            <jms:outbound-endpoint queue="in" connector-ref="Active_MQ" doc:name="JMS"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="associatebankerrorloggerFlow1">
+        <jms:inbound-endpoint queue="in" connector-ref="Active_MQ" doc:name="JMS">
+        </jms:inbound-endpoint>
+        <set-payload value="#[payload]" doc:name="Set Payload"/>
+        
+    </flow>
+</mule>
